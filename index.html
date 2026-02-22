@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 图表生成器</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f13;--surface:#1a1a24;--surface2:#22223a;--border:#2d2d4a;--text:#e4e4ef;--text2:#9494b8;--accent:#6c5ce7;--accent2:#a29bfe;--success:#00cec9;--danger:#ff6b6b;--radius:12px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+.logo{font-size:20px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--success));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-size:14px;font-weight:400;-webkit-text-fill-color:var(--text2);margin-left:8px}
+.api-key-area{margin-left:auto;display:flex;align-items:center;gap:8px}
+.api-key-area input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:13px;width:260px}
+.api-key-area input:focus{outline:none;border-color:var(--accent)}
+.api-key-area label{color:var(--text2);font-size:13px;white-space:nowrap}
+main{display:flex;flex:1;overflow:hidden}
+.left-panel{width:420px;min-width:320px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column}
+.right-panel{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{padding:10px 20px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.input-section{padding:16px;display:flex;flex-direction:column;gap:12px;flex:1;overflow:auto}
+.input-section h3{font-size:14px;color:var(--text2);font-weight:500}
+.chart-types{display:flex;flex-wrap:wrap;gap:6px}
+.chart-type{padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;transition:.2s}
+.chart-type:hover{border-color:var(--accent);color:var(--text)}
+.chart-type.active{background:var(--accent);border-color:var(--accent);color:#fff}
+textarea{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:12px;font-size:14px;resize:none;font-family:inherit;line-height:1.6}
+textarea:focus{outline:none;border-color:var(--accent)}
+#descInput{height:120px}
+#codeEditor{flex:1;min-height:200px;font-family:'SF Mono',Monaco,'Cascadia Code',monospace;font-size:13px;line-height:1.7;tab-size:2}
+.btn{padding:10px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;border:none;transition:.2s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent2)}
+.btn-group{display:flex;gap:8px}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:8px}
+.preview-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.preview-header h3{font-size:14px;color:var(--text2);font-weight:500}
+.preview-area{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px;position:relative}
+#diagramOutput{max-width:100%;overflow:auto}
+#diagramOutput svg{max-width:100%;height:auto}
+.loading{display:none;align-items:center;gap:8px;color:var(--accent2);font-size:13px}
+.loading.show{display:flex}
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-bar{padding:8px 16px;font-size:12px;color:var(--text2);border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;min-height:32px;display:flex;align-items:center}
+.status-bar.error{color:var(--danger)}
+.status-bar.success{color:var(--success)}
+.empty-state{text-align:center;color:var(--text2);padding:40px}
+.empty-state .icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.empty-state p{font-size:14px;line-height:1.8}
+.templates{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.tpl{padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);cursor:pointer;transition:.2s;line-height:1.5}
+.tpl:hover{border-color:var(--accent);color:var(--text)}
+.tpl b{color:var(--accent2);font-weight:500}
+.zoom-controls{display:flex;align-items:center;gap:4px}
+.zoom-controls button{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.zoom-controls button:hover{border-color:var(--accent);color:var(--text)}
+.zoom-controls span{font-size:12px;color:var(--text2);min-width:40px;text-align:center}
+.hidden{display:none!important}
+@media(max-width:768px){
+  main{flex-direction:column}
+  .left-panel{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--border);max-height:50vh}
+  .right-panel{min-height:50vh}
+  header{flex-wrap:wrap;gap:8px}
+  .api-key-area{margin-left:0;width:100%}
+  .api-key-area input{flex:1}
+}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">&#9670; AI 图表生成器<span>Mermaid Powered</span></div>
+  <div class="api-key-area">
+    <label for="apiKey">DeepSeek API Key:</label>
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+  </div>
+</header>
+
+<main>
+  <div class="left-panel">
+    <div class="tabs">
+      <div class="tab active" data-tab="generate" onclick="switchTab('generate')">&#9998; AI 生成</div>
+      <div class="tab" data-tab="editor" onclick="switchTab('editor')">&#60;/&#62; 代码编辑</div>
+    </div>
+
+    <div id="tab-generate" class="input-section">
+      <h3>图表类型</h3>
+      <div class="chart-types">
+        <div class="chart-type active" data-type="flowchart">流程图</div>
+        <div class="chart-type" data-type="sequence">时序图</div>
+        <div class="chart-type" data-type="class">类图</div>
+        <div class="chart-type" data-type="gantt">甘特图</div>
+        <div class="chart-type" data-type="mindmap">思维导图</div>
+        <div class="chart-type" data-type="er">ER图</div>
+        <div class="chart-type" data-type="state">状态图</div>
+        <div class="chart-type" data-type="pie">饼图</div>
+      </div>
+
+      <h3>描述你想要的图表</h3>
+      <textarea id="descInput" placeholder="例如：用户登录流程，包含输入账号密码、验证、成功/失败分支..."></textarea>
+
+      <button class="btn btn-primary" id="generateBtn" onclick="generateDiagram()">
+        &#9889; AI 生成图表
+      </button>
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span>AI 正在生成中...</span>
+      </div>
+
+      <h3>快速模板</h3>
+      <div class="templates">
+        <div class="tpl" onclick="useTemplate('login')"><b>用户登录流程</b> - 含验证、2FA、错误处理</div>
+        <div class="tpl" onclick="useTemplate('microservice')"><b>微服务架构</b> - API网关、服务发现、消息队列</div>
+        <div class="tpl" onclick="useTemplate('cicd')"><b>CI/CD 流水线</b> - 构建、测试、部署流程</div>
+        <div class="tpl" onclick="useTemplate('order')"><b>订单状态机</b> - 电商订单生命周期</div>
+      </div>
+    </div>
+
+    <div id="tab-editor" class="input-section hidden">
+      <h3>Mermaid 代码</h3>
+      <textarea id="codeEditor" placeholder="在此输入或编辑 Mermaid 代码..." spellcheck="false"></textarea>
+      <button class="btn btn-primary" onclick="renderFromEditor()">&#9654; 渲染图表</button>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="preview-header">
+      <h3>&#128065; 预览</h3>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="zoom-controls">
+          <button onclick="zoom(-0.1)" title="缩小">-</button>
+          <span id="zoomLevel">100%</span>
+          <button onclick="zoom(0.1)" title="放大">+</button>
+          <button onclick="zoomReset()" title="重置" style="font-size:11px">1:1</button>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary btn-sm" onclick="exportAs('svg')">&#8681; SVG</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportAs('png')">&#8681; PNG</button>
+        </div>
+      </div>
+    </div>
+    <div class="preview-area" id="previewArea">
+      <div id="diagramOutput">
+        <div class="empty-state">
+          <div class="icon">&#128202;</div>
+          <p>输入描述，让 AI 帮你生成图表<br>或在代码编辑器中直接编写 Mermaid 代码</p>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar" id="statusBar">就绪</div>
+  </div>
+</main>
+
+<script>
+// Init mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#6c5ce7',
+    primaryTextColor: '#e4e4ef',
+    primaryBorderColor: '#a29bfe',
+    lineColor: '#9494b8',
+    secondaryColor: '#22223a',
+    tertiaryColor: '#1a1a24',
+    background: '#0f0f13',
+    mainBkg: '#22223a',
+    nodeBorder: '#6c5ce7',
+    clusterBkg: '#1a1a24',
+    titleColor: '#e4e4ef',
+    edgeLabelBackground: '#1a1a24'
+  },
+  flowchart: { curve: 'basis', padding: 20 },
+  sequence: { mirrorActors: false },
+  fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+});
+
+let currentZoom = 1;
+let currentMermaidCode = '';
+let selectedType = 'flowchart';
+
+// API key persistence
+const apiKeyInput = document.getElementById('apiKey');
+apiKeyInput.value = localStorage.getItem('deepseek_api_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('deepseek_api_key', apiKeyInput.value);
+});
+
+// Chart type selection
+document.querySelectorAll('.chart-type').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.chart-type').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    selectedType = el.dataset.type;
+  });
+});
+
+// Tab switching
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+  document.getElementById('tab-generate').classList.toggle('hidden', tab !== 'generate');
+  document.getElementById('tab-editor').classList.toggle('hidden', tab !== 'editor');
+  if (tab === 'editor' && currentMermaidCode) {
+    document.getElementById('codeEditor').value = currentMermaidCode;
+  }
+}
+
+// Status
+function setStatus(msg, type = '') {
+  const bar = document.getElementById('statusBar');
+  bar.textContent = msg;
+  bar.className = 'status-bar' + (type ? ' ' + type : '');
+}
+
+// Zoom
+function zoom(delta) {
+  currentZoom = Math.max(0.2, Math.min(3, currentZoom + delta));
+  applyZoom();
+}
+function zoomReset() { currentZoom = 1; applyZoom(); }
+function applyZoom() {
+  document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+  const svg = document.querySelector('#diagramOutput svg');
+  if (svg) svg.style.transform = `scale(${currentZoom})`;
+}
+
+// Templates
+const templates = {
+  login: `graph TD
+    A[用户访问登录页] --> B[输入账号密码]
+    B --> C{验证凭据}
+    C -->|成功| D{是否开启2FA}
+    C -->|失败| E[显示错误提示]
+    E --> F{重试次数 < 3?}
+    F -->|是| B
+    F -->|否| G[账户锁定30分钟]
+    D -->|是| H[发送验证码]
+    H --> I[输入验证码]
+    I --> J{验证码正确?}
+    J -->|是| K[登录成功]
+    J -->|否| H
+    D -->|否| K
+    K --> L[跳转到首页]`,
+  microservice: `graph TB
+    Client[客户端] --> Gateway[API 网关]
+    Gateway --> Auth[认证服务]
+    Gateway --> UserSvc[用户服务]
+    Gateway --> OrderSvc[订单服务]
+    Gateway --> ProductSvc[商品服务]
+    UserSvc --> UserDB[(用户数据库)]
+    OrderSvc --> OrderDB[(订单数据库)]
+    ProductSvc --> ProductDB[(商品数据库)]
+    OrderSvc --> MQ[消息队列]
+    MQ --> NotifySvc[通知服务]
+    MQ --> InventorySvc[库存服务]
+    InventorySvc --> ProductDB
+    Auth --> Redis[(Redis 缓存)]
+    Gateway --> Redis
+    subgraph 监控
+      Prometheus[Prometheus] --> Grafana[Grafana]
+    end
+    UserSvc -.-> Prometheus
+    OrderSvc -.-> Prometheus
+    ProductSvc -.-> Prometheus`,
+  cicd: `graph LR
+    A[代码提交] --> B[触发 Webhook]
+    B --> C[拉取代码]
+    C --> D[安装依赖]
+    D --> E[代码检查]
+    E --> F[单元测试]
+    F --> G{测试通过?}
+    G -->|否| H[通知开发者]
+    G -->|是| I[构建镜像]
+    I --> J[推送到镜像仓库]
+    J --> K[部署到测试环境]
+    K --> L[集成测试]
+    L --> M{测试通过?}
+    M -->|否| H
+    M -->|是| N{是否为主分支?}
+    N -->|否| O[等待合并]
+    N -->|是| P[部署到生产环境]
+    P --> Q[健康检查]
+    Q --> R[发布完成通知]`,
+  order: `stateDiagram-v2
+    [*] --> 待支付: 创建订单
+    待支付 --> 已支付: 支付成功
+    待支付 --> 已取消: 超时未支付
+    待支付 --> 已取消: 用户取消
+    已支付 --> 待发货: 商家确认
+    已支付 --> 退款中: 申请退款
+    待发货 --> 已发货: 商家发货
+    待发货 --> 退款中: 申请退款
+    已发货 --> 已签收: 确认收货
+    已发货 --> 已签收: 自动签收(15天)
+    已签收 --> 已完成: 评价/超时
+    已签收 --> 售后中: 申请售后
+    退款中 --> 已退款: 退款成功
+    退款中 --> 已支付: 退款拒绝
+    售后中 --> 已退款: 退货退款
+    售后中 --> 已完成: 售后完成
+    已退款 --> [*]
+    已完成 --> [*]
+    已取消 --> [*]`
+};
+
+function useTemplate(name) {
+  const code = templates[name];
+  if (code) {
+    currentMermaidCode = code;
+    document.getElementById('codeEditor').value = code;
+    renderMermaid(code);
+  }
+}
+
+// Render mermaid
+async function renderMermaid(code) {
+  const output = document.getElementById('diagramOutput');
+  try {
+    const id = 'mermaid-' + Date.now();
+    const { svg } = await mermaid.render(id, code);
+    output.innerHTML = svg;
+    currentMermaidCode = code;
+    document.getElementById('codeEditor').value = code;
+    applyZoom();
+    setStatus('渲染成功', 'success');
+  } catch (err) {
+    output.innerHTML = `<div class="empty-state"><div class="icon">&#9888;</div><p>渲染错误: ${err.message || '语法错误'}<br>请检查 Mermaid 代码</p></div>`;
+    setStatus('渲染失败: ' + (err.message || '语法错误'), 'error');
+  }
+}
+
+function renderFromEditor() {
+  const code = document.getElementById('codeEditor').value.trim();
+  if (!code) return setStatus('请输入 Mermaid 代码', 'error');
+  renderMermaid(code);
+}
+
+// AI Generate
+async function generateDiagram() {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) return setStatus('请先输入 DeepSeek API Key', 'error');
+
+  const desc = document.getElementById('descInput').value.trim();
+  if (!desc) return setStatus('请输入图表描述', 'error');
+
+  const btn = document.getElementById('generateBtn');
+  const loading = document.getElementById('loading');
+  btn.disabled = true;
+  loading.classList.add('show');
+  setStatus('AI 正在生成...');
+
+  const typeMap = {
+    flowchart: '流程图 (graph TD/LR)',
+    sequence: '时序图 (sequenceDiagram)',
+    class: '类图 (classDiagram)',
+    gantt: '甘特图 (gantt)',
+    mindmap: '思维导图 (mindmap)',
+    er: 'ER图 (erDiagram)',
+    state: '状态图 (stateDiagram-v2)',
+    pie: '饼图 (pie)'
+  };
+
+  const prompt = `你是一个 Mermaid 图表专家。请根据用户描述生成 Mermaid 代码。
+
+要求：
+1. 图表类型：${typeMap[selectedType]}
+2. 只输出 Mermaid 代码，不要任何解释、不要 markdown 代码块标记
+3. 确保语法正确，可以直接被 Mermaid.js v11 渲染
+4. 节点文字使用中文
+5. 图表要详细、完整、美观
+6. 注意：节点ID不要使用中文，用英文或拼音缩写，中文放在方括号/圆括号等标签里
+
+用户描述：${desc}`;
+
+  try {
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 4096
+      })
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `API 错误 (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    let code = data.choices[0].message.content.trim();
+
+    // Clean up markdown fences if present
+    code = code.replace(/^```(?:mermaid)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+    currentMermaidCode = code;
+    document.getElementById('codeEditor').value = code;
+    await renderMermaid(code);
+    setStatus('AI 生成完成', 'success');
+  } catch (err) {
+    setStatus('生成失败: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('show');
+  }
+}
+
+// Export
+async function exportAs(format) {
+  const svgEl = document.querySelector('#diagramOutput svg');
+  if (!svgEl) return setStatus('没有可导出的图表', 'error');
+
+  try {
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+
+    if (format === 'svg') {
+      const blob = new Blob([svgData], { type: 'image/svg+xml' });
+      downloadBlob(blob, 'diagram.svg');
+      setStatus('SVG 已导出', 'success');
+      return;
+    }
+
+    // PNG export
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    await new Promise((resolve, reject) => {
+      img.onload = () => {
+        const scale = 2; // retina
+        canvas.width = img.naturalWidth * scale;
+        canvas.height = img.naturalHeight * scale;
+        ctx.scale(scale, scale);
+        ctx.fillStyle = '#0f0f13';
+        ctx.fillRect(0, 0, img.naturalWidth, img.naturalHeight);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    canvas.toBlob(blob => {
+      downloadBlob(blob, 'diagram.png');
+      setStatus('PNG 已导出 (2x)', 'success');
+    }, 'image/png');
+  } catch (err) {
+    setStatus('导出失败: ' + err.message, 'error');
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    const editorTab = document.getElementById('tab-editor');
+    if (!editorTab.classList.contains('hidden')) {
+      renderFromEditor();
+    } else {
+      generateDiagram();
+    }
+  }
+});
+
+// Allow Tab in textarea
+document.getElementById('codeEditor').addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ta = e.target;
+    const start = ta.selectionStart;
+    ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(ta.selectionEnd);
+    ta.selectionStart = ta.selectionEnd = start + 2;
+  }
+});
+</script>
+</body>
+</html>
